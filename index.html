@@ -24,8 +24,8 @@
         const ctx = canvas.getContext('2d');
         let trails = [];
         let circles = []; // 円を格納する配列
-        const maxTrails = 10000; // トレイルの最大数
-        const maxVisibleTrails = 10000; // 表示するトレイルの最大数
+        const maxTrails = 500; // トレイルの最大数
+        const maxVisibleTrails = 500; // 表示するトレイルの最大数
         let isDrawing = false;
         let lastDrawTime = 0;
         const drawInterval = 10; // トレイルを追加する間隔（ミリ秒）
@@ -70,7 +70,9 @@
 
         canvas.addEventListener('touchend', () => {
             isDrawing = false;
-            circles = []; // 円を全てクリア
+            circles.forEach(circle => {
+                circle.fadeOut = true; // フェードアウトを開始
+            });
         });
 
         canvas.addEventListener('touchmove', (e) => {
