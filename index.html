@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mouse Trail Effect</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let trails = [];
+        let circles = []; // 円を格納する配列
+        const maxTrails = 10000; // トレイルの最大数
+        const maxVisibleTrails = 10000; // 表示するトレイルの最大数
+        let isDrawing = false;
+        let lastDrawTime = 0;
+        const drawInterval = 10; // トレイルを追加する間隔（ミリ秒）
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            isDrawing = true;
+            trails = [];  // 描画開始時にトレイルをリセット
+            circles.push({ x: e.clientX, y: e.clientY, radius: 50, alpha: 1.0 }); // 円を追加
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDrawing = false;
+        });
+
+        const delayFactor = 10; // 遅延の度合いを設定（大きいほど遅れる）
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDrawing && (Date.now() - lastDrawTime > drawInterval)) {
+                setTimeout(() => { // setTimeoutを使用して遅延を実現
+                    trails.push({ x: e.clientX, y: e.clientY, alpha: 1.0, width: 15 });
+                    if (trails.length > maxTrails) trails.shift();
+                }, delayFactor * drawInterval); // 遅延時間を設定
+                lastDrawTime = Date.now();
+            }
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            isDrawing = true;
+            trails = [];  // 描画開始時にトレイルをリセット
+            const touch = e.touches[0];
+            circles.push({ x: touch.clientX, y: touch.clientY, radius: 50, alpha: 1.0 }); // 円を追加
+        });
+
+        canvas.addEventListener('touchend', () => {
+            isDrawing = false;
+            circles = []; // 円を全てクリア
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault(); // スクロールを防ぐ
+            if (isDrawing && (Date.now() - lastDrawTime > drawInterval)) {
+                setTimeout(() => { // setTimeoutを使用して遅延を実現
+                    const touch = e.touches[0];
+                    trails.push({ x: touch.clientX, y: touch.clientY, alpha: 1.0, width: 15 });
+                    if (trails.length > maxTrails) trails.shift();
+                }, delayFactor * drawInterval); // 遅延時間を設定
+                lastDrawTime = Date.now();
+            }
+        });
+
+
+        function draw() {
+            ctx.fillStyle = 'rgba(255, 255, 255, 1.0)';  // 背景を白に設定
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const visibleTrails = trails.slice(-maxVisibleTrails); // 表示するトレイルの数を制限
+
+            if (visibleTrails.length > 1) {
+                for (let i = 0; i < visibleTrails.length - 1; i++) {
+                    const t0 = visibleTrails[i];
+                    const t1 = visibleTrails[i + 1];
+                    const midX = (t0.x + t1.x) / 2;
+                    const midY = (t0.y + t1.y) / 2;
+
+                    ctx.beginPath();
+                    ctx.moveTo(t0.x, t0.y);
+                    ctx.quadraticCurveTo(midX, midY, t1.x, t1.y); // 中点を制御点として使用
+                    ctx.strokeStyle = `rgba(240, 240, 240, ${t0.alpha})`; // グレーに設定
+                    ctx.lineWidth = t0.width; // 線の太さをトレイルの幅に設定
+                    ctx.stroke();
+
+                    // フェードアウトとともに太さを減少
+                    t0.alpha -= 0.1;
+                    t0.width *= 0.95; // 太さを減少させる
+                }
+            }
+            // 円を描画しフェードアウトさせる
+            circles.forEach((circle, index) => {
+                ctx.beginPath();
+                ctx.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
+
+                // グラデーションを作成
+                let gradient = ctx.createRadialGradient(circle.x, circle.y, 0, circle.x, circle.y, circle.radius);
+                gradient.addColorStop(0, 'rgba(244, 244, 244, 0.3)'); // 中心は白
+                gradient.addColorStop(1, 'rgba(222, 222, 222, 0.3)'); // 外側は黒
+
+                ctx.fillStyle = gradient;
+                ctx.fill();
+
+                // 縁の設定（オプション）
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.0)';
+                ctx.stroke();
+
+                // フェードアウトとともにサイズを減少
+                circle.alpha -= 0.05;
+                circle.radius *= 0.95; // 半径を減少させる
+
+                if (circle.alpha <= 0 || circle.radius <= 0.5) {
+                    circles.splice(index, 1); // 完全に透明になるか、非常に小さくなったら配列から削除
+                }
+            });
+            trails = trails.filter(t => t.alpha > 0);
+            requestAnimationFrame(draw);
+        }
+
+        draw();
+    </script>
+</body>
+
+</html>
