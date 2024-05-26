@@ -173,10 +173,10 @@
             circles.forEach((circle, index) => {
                 // 時間経過に応じて円のサイズを大きくする
                 const elapsedTime = currentTime - circle.creationTime;
-                if (elapsedTime < 1000 && !circle.fadeOut) {
-                    circle.radius = 50 + (elapsedTime / 1000) * 5; // 1秒かけて1.1倍のサイズにする
+                if (elapsedTime < 300 && !circle.fadeOut) {
+                    circle.radius = 50 + (elapsedTime / 300) * 2; // 0.5秒かけて1.1倍のサイズにする
                 } else if (circle.fadeOut) {
-                    circle.radius *= 0.9; // フェードアウト時に半径を減少させる
+                    circle.radius *= 0.95; // フェードアウト時に半径を減少させる
                 }
 
                 ctx.beginPath();
@@ -205,6 +205,7 @@
 
         draw();
     </script>
+
 </body>
 
 </html>
