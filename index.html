@@ -33,7 +33,9 @@
         let startTime = 0; // ダウンイベントのタイムスタンプ
         let ignoreEvent = false; // イベントを無視するかどうかのフラグ
         let mouseDown = false; // マウスダウンが続いているかどうかのフラグ
+        let touchDown = false; // タッチダウンが続いているかどうかのフラグ
         let circleTimer = null; // 円を追加するためのタイマー
+        let touchInProgress = false; // タッチイベントが発生したかどうかのフラグ
 
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -49,7 +51,7 @@
 
         function startCircleTimer(x, y) {
             circleTimer = setInterval(() => {
-                if (mouseDown && !ignoreEvent) {
+                if ((mouseDown || touchDown) && !ignoreEvent) {
                     addCircle(x, y);
                 }
             }, 50);
@@ -66,13 +68,16 @@
             });
         }
 
+        // マウスイベントの処理
         canvas.addEventListener('mousedown', (e) => {
+            if (touchInProgress) return; // タッチイベントが発生している場合は無視
             startTime = Date.now(); // タイムスタンプを記録
             ignoreEvent = false;
             mouseDown = true;
             console.log('mousedown detected'); // コンソールログ出力
             isDrawing = true;
             trails = [];  // 描画開始時にトレイルをリセット
+            circles = []; // 円をリセット
 
             setTimeout(() => {
                 if (!ignoreEvent && (Date.now() - startTime >= startDelay)) {
@@ -83,6 +88,7 @@
         });
 
         canvas.addEventListener('mouseup', () => {
+            if (touchInProgress) return; // タッチイベントが発生している場合は無視
             isDrawing = false;
             mouseDown = false;
             stopCircleTimer(); // 円を追加するタイマーを停止
@@ -92,6 +98,7 @@
         const delayFactor = 10; // 遅延の度合いを設定（大きいほど遅れる）
 
         canvas.addEventListener('mousemove', (e) => {
+            if (touchInProgress) return; // タッチイベントが発生している場合は無視
             if (mouseDown) {
                 ignoreEvent = true;
                 console.log('mousemove detected while mouse down, starting fade out'); // コンソールログ出力
@@ -107,27 +114,50 @@
             }
         });
 
+        // タッチイベントの処理
         canvas.addEventListener('touchstart', (e) => {
+            touchInProgress = true;
+            startTime = Date.now(); // タイムスタンプを記録
+            ignoreEvent = false;
+            touchDown = true;
+            console.log('touchstart detected'); // コンソールログ出力
+            isDrawing = true;
+            trails = [];  // 描画開始時にトレイルをリセット
+            circles = []; // 円をリセット
             const touch = e.touches[0];
-            const mouseEvent = new MouseEvent('mousedown', {
-                clientX: touch.clientX,
-                clientY: touch.clientY
-            });
-            canvas.dispatchEvent(mouseEvent);
+
+            setTimeout(() => {
+                if (!ignoreEvent && (Date.now() - startTime >= startDelay)) {
+                    addCircle(touch.clientX, touch.clientY);
+                    startCircleTimer(touch.clientX, touch.clientY); // 円を追加するタイマーを開始
+                }
+            }, startDelay);
         });
 
-        canvas.addEventListener('touchend', (e) => {
-            const mouseEvent = new MouseEvent('mouseup', {});
-            canvas.dispatchEvent(mouseEvent);
+        canvas.addEventListener('touchend', () => {
+            isDrawing = false;
+            touchDown = false;
+            stopCircleTimer(); // 円を追加するタイマーを停止
+            startFadeOut(); // 円をフェードアウト開始
+            touchInProgress = false; // タッチイベント終了
         });
 
         canvas.addEventListener('touchmove', (e) => {
-            const touch = e.touches[0];
-            const mouseEvent = new MouseEvent('mousemove', {
-                clientX: touch.clientX,
-                clientY: touch.clientY
-            });
-            canvas.dispatchEvent(mouseEvent);
+            if (touchDown) {
+                ignoreEvent = true;
+                console.log('touchmove detected while touch down, starting fade out'); // コンソールログ出力
+                startFadeOut(); // 円をフェードアウト開始
+            }
+            if (isDrawing && (Date.now() - lastDrawTime > drawInterval)) {
+                console.log('touchmove detected'); // コンソールログ出力
+                e.preventDefault(); // スクロールを防ぐ
+                const touch = e.touches[0];
+                setTimeout(() => { // setTimeoutを使用して遅延を実現
+                    trails.push({ x: touch.clientX, y: touch.clientY, alpha: 1.0, width: 15 });
+                    if (trails.length > maxTrails) trails.shift();
+                }, delayFactor * drawInterval); // 遅延時間を設定
+                lastDrawTime = Date.now();
+            }
         });
 
         function draw() {
