@@ -43,15 +43,15 @@
             canvas.height = window.innerHeight;
         });
 
-        function addCircle(x, y) {
-            circles.push({ x: x, y: y, radius: 50, alpha: 1.0, fadeOut: false });
+        function addCircle(x, y, radius) {
+            circles.push({ x: x, y: y, radius: radius, alpha: 1.0, fadeOut: false, creationTime: Date.now() });
         }
 
         function startCircleTimer(x, y) {
             if (!circleTimer) {
                 circleTimer = setInterval(() => {
                     if (mouseDown && !ignoreEvent) {
-                        addCircle(x, y);
+                        addCircle(x, y, 50); // 初期サイズの円を追加
                     }
                 }, 50);
             }
@@ -80,7 +80,7 @@
 
             setTimeout(() => {
                 if (!ignoreEvent && (Date.now() - startTime >= startDelay)) {
-                    addCircle(e.clientX, e.clientY);
+                    addCircle(e.clientX, e.clientY, 50); // 初期サイズの円を追加
                     startCircleTimer(e.clientX, e.clientY); // 円を追加するタイマーを開始
                 }
             }, startDelay);
@@ -145,7 +145,7 @@
         });
 
         function draw() {
-            ctx.fillStyle = 'rgba(255, 255, 255, 1.0)';  // 背景を赤に設定
+            ctx.fillStyle = 'rgba(255, 255, 255, 1.0)';  // 背景を白に設定
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             const visibleTrails = trails.slice(-maxVisibleTrails); // 表示するトレイルの数を制限
@@ -169,7 +169,16 @@
                     t0.width *= 0.95; // 太さを減少させる
                 }
             }
+            const currentTime = Date.now();
             circles.forEach((circle, index) => {
+                // 時間経過に応じて円のサイズを大きくする
+                const elapsedTime = currentTime - circle.creationTime;
+                if (elapsedTime < 1000 && !circle.fadeOut) {
+                    circle.radius = 50 + (elapsedTime / 1000) * 5; // 1秒かけて1.1倍のサイズにする
+                } else if (circle.fadeOut) {
+                    circle.radius *= 0.9; // フェードアウト時に半径を減少させる
+                }
+
                 ctx.beginPath();
                 ctx.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
 
@@ -184,7 +193,6 @@
                 // フェードアウトとともにサイズを減少
                 if (circle.fadeOut) {
                     circle.alpha -= 0.05;
-                    circle.radius *= 0.9; // 半径を減少させる
                 }
 
                 if (circle.alpha <= 0 || circle.radius <= 0.5) {
@@ -197,7 +205,6 @@
 
         draw();
     </script>
-
 </body>
 
 </html>
