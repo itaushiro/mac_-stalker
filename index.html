@@ -29,6 +29,11 @@
         let isDrawing = false;
         let lastDrawTime = 0;
         const drawInterval = 10; // トレイルを追加する間隔（ミリ秒）
+        const startDelay = 50; // イベント発生から無視する時間（ミリ秒）
+        let startTime = 0; // ダウンイベントのタイムスタンプ
+        let ignoreEvent = false; // イベントを無視するかどうかのフラグ
+        let mouseDown = false; // マウスダウンが続いているかどうかのフラグ
+        let circleTimer = null; // 円を追加するためのタイマー
 
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -38,20 +43,62 @@
             canvas.height = window.innerHeight;
         });
 
+        function addCircle(x, y) {
+            circles.push({ x: x, y: y, radius: 50, alpha: 1.0, fadeOut: false });
+        }
+
+        function startCircleTimer(x, y) {
+            circleTimer = setInterval(() => {
+                if (mouseDown && !ignoreEvent) {
+                    addCircle(x, y);
+                }
+            }, 50);
+        }
+
+        function stopCircleTimer() {
+            clearInterval(circleTimer);
+            circleTimer = null;
+        }
+
+        function startFadeOut() {
+            circles.forEach(circle => {
+                circle.fadeOut = true;
+            });
+        }
+
         canvas.addEventListener('mousedown', (e) => {
+            startTime = Date.now(); // タイムスタンプを記録
+            ignoreEvent = false;
+            mouseDown = true;
+            console.log('mousedown detected'); // コンソールログ出力
             isDrawing = true;
             trails = [];  // 描画開始時にトレイルをリセット
-            circles.push({ x: e.clientX, y: e.clientY, radius: 50, alpha: 1.0 }); // 円を追加
+
+            setTimeout(() => {
+                if (!ignoreEvent && (Date.now() - startTime >= startDelay)) {
+                    addCircle(e.clientX, e.clientY);
+                    startCircleTimer(e.clientX, e.clientY); // 円を追加するタイマーを開始
+                }
+            }, startDelay);
         });
 
         canvas.addEventListener('mouseup', () => {
             isDrawing = false;
+            mouseDown = false;
+            stopCircleTimer(); // 円を追加するタイマーを停止
+            startFadeOut(); // 円をフェードアウト開始
         });
 
         const delayFactor = 10; // 遅延の度合いを設定（大きいほど遅れる）
 
         canvas.addEventListener('mousemove', (e) => {
+            if (mouseDown) {
+                ignoreEvent = true;
+                console.log('mousemove detected while mouse down, starting fade out'); // コンソールログ出力
+                startFadeOut(); // 円をフェードアウト開始
+            }
             if (isDrawing && (Date.now() - lastDrawTime > drawInterval)) {
+                console.log('mousemove detected'); // コンソールログ出力
                 setTimeout(() => { // setTimeoutを使用して遅延を実現
                     trails.push({ x: e.clientX, y: e.clientY, alpha: 1.0, width: 15 });
                     if (trails.length > maxTrails) trails.shift();
@@ -61,35 +108,30 @@
         });
 
         canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            isDrawing = true;
-            trails = [];  // 描画開始時にトレイルをリセット
             const touch = e.touches[0];
-            circles.push({ x: touch.clientX, y: touch.clientY, radius: 50, alpha: 1.0 }); // 円を追加
+            const mouseEvent = new MouseEvent('mousedown', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            canvas.dispatchEvent(mouseEvent);
         });
 
-        canvas.addEventListener('touchend', () => {
-            isDrawing = false;
-            circles.forEach(circle => {
-                circle.fadeOut = true; // フェードアウトを開始
-            });
+        canvas.addEventListener('touchend', (e) => {
+            const mouseEvent = new MouseEvent('mouseup', {});
+            canvas.dispatchEvent(mouseEvent);
         });
 
         canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault(); // スクロールを防ぐ
-            if (isDrawing && (Date.now() - lastDrawTime > drawInterval)) {
-                setTimeout(() => { // setTimeoutを使用して遅延を実現
-                    const touch = e.touches[0];
-                    trails.push({ x: touch.clientX, y: touch.clientY, alpha: 1.0, width: 15 });
-                    if (trails.length > maxTrails) trails.shift();
-                }, delayFactor * drawInterval); // 遅延時間を設定
-                lastDrawTime = Date.now();
-            }
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousemove', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            canvas.dispatchEvent(mouseEvent);
         });
 
-
         function draw() {
-            ctx.fillStyle = 'rgba(255, 255, 255, 1.0)';  // 背景を白に設定
+            ctx.fillStyle = 'rgba(255, 255, 255, 1.0)';  // 背景を赤に設定
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             const visibleTrails = trails.slice(-maxVisibleTrails); // 表示するトレイルの数を制限
@@ -113,27 +155,23 @@
                     t0.width *= 0.95; // 太さを減少させる
                 }
             }
-            // 円を描画しフェードアウトさせる
             circles.forEach((circle, index) => {
                 ctx.beginPath();
                 ctx.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
 
                 // グラデーションを作成
                 let gradient = ctx.createRadialGradient(circle.x, circle.y, 0, circle.x, circle.y, circle.radius);
-                gradient.addColorStop(0, 'rgba(244, 244, 244, 0.3)'); // 中心は白
-                gradient.addColorStop(1, 'rgba(222, 222, 222, 0.3)'); // 外側は黒
+                gradient.addColorStop(0, `rgba(244, 244, 244, ${circle.alpha})`); // 中心は白で透明度を反映
+                gradient.addColorStop(1, `rgba(222, 222, 222, ${circle.alpha})`); // 外側は黒で透明度を反映
 
                 ctx.fillStyle = gradient;
                 ctx.fill();
 
-                // 縁の設定（オプション）
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.0)';
-                ctx.stroke();
-
                 // フェードアウトとともにサイズを減少
-                circle.alpha -= 0.05;
-                circle.radius *= 0.95; // 半径を減少させる
+                if (circle.fadeOut) {
+                    circle.alpha -= 0.05;
+                    circle.radius *= 0.9; // 半径を減少させる
+                }
 
                 if (circle.alpha <= 0 || circle.radius <= 0.5) {
                     circles.splice(index, 1); // 完全に透明になるか、非常に小さくなったら配列から削除
@@ -145,6 +183,8 @@
 
         draw();
     </script>
+
+
 </body>
 
 </html>
