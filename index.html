@@ -34,6 +34,7 @@
         let ignoreEvent = false; // イベントを無視するかどうかのフラグ
         let mouseDown = false; // マウスダウンが続いているかどうかのフラグ
         let circleTimer = null; // 円を追加するためのタイマー
+        let quickClickCircle = null; // すぐにクリック解除された場合に円を削除するためのフラグ
 
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -44,7 +45,10 @@
         });
 
         function addCircle(x, y, radius) {
-            circles.push({ x: x, y: y, radius: radius, alpha: 1.0, fadeOut: false, creationTime: Date.now() });
+            let circle = { x: x, y: y, radius: radius, alpha: 1.0, fadeOut: false, creationTime: Date.now() };
+            circles.push(circle);
+            console.log('Circle added:', circle);
+            return circle;
         }
 
         function startCircleTimer(x, y) {
@@ -66,6 +70,7 @@
             circles.forEach(circle => {
                 circle.fadeOut = true;
             });
+            console.log('Circles start fade out:', circles);
         }
 
         // マウスイベントの処理
@@ -73,14 +78,14 @@
             startTime = Date.now(); // タイムスタンプを記録
             ignoreEvent = false;
             mouseDown = true;
-            console.log('mousedown detected'); // コンソールログ出力
+            quickClickCircle = null;
+            console.log('mousedown detected at:', startTime); // コンソールログ出力
             isDrawing = true;
             trails = [];  // 描画開始時にトレイルをリセット
-            circles = []; // 円をリセット
 
             setTimeout(() => {
-                if (!ignoreEvent && (Date.now() - startTime >= startDelay)) {
-                    addCircle(e.clientX, e.clientY, 50); // 初期サイズの円を追加
+                if (!ignoreEvent && (Date.now() - startTime >= startDelay) && mouseDown) {
+                    quickClickCircle = addCircle(e.clientX, e.clientY, 50); // 初期サイズの円を追加
                     startCircleTimer(e.clientX, e.clientY); // 円を追加するタイマーを開始
                 }
             }, startDelay);
@@ -92,7 +97,17 @@
             isDrawing = false;
             mouseDown = false;
             stopCircleTimer(); // 円を追加するタイマーを停止
-            startFadeOut(); // 円をフェードアウト開始
+
+            if (Date.now() - startTime < startDelay && quickClickCircle) {
+                const index = circles.indexOf(quickClickCircle);
+                if (index > -1) {
+                    console.log('Quick click detected, removing circle:', quickClickCircle);
+                    circles.splice(index, 1);
+                }
+            } else {
+                console.log('mouseup detected, starting fade out');
+                startFadeOut(); // 円をフェードアウト開始
+            }
         }
 
         canvas.addEventListener('mouseup', handleMouseUp);
@@ -125,12 +140,14 @@
                 clientX: touch.clientX,
                 clientY: touch.clientY
             });
+            console.log('touchstart detected:', touch);
             canvas.dispatchEvent(mouseEvent);
         });
 
         canvas.addEventListener('touchend', (e) => {
             e.preventDefault();
             const mouseEvent = new MouseEvent('mouseup', {});
+            console.log('touchend detected');
             canvas.dispatchEvent(mouseEvent);
         });
 
@@ -141,6 +158,7 @@
                 clientX: touch.clientX,
                 clientY: touch.clientY
             });
+            console.log('touchmove detected:', touch);
             canvas.dispatchEvent(mouseEvent);
         });
 
@@ -174,7 +192,7 @@
                 // 時間経過に応じて円のサイズを大きくする
                 const elapsedTime = currentTime - circle.creationTime;
                 if (elapsedTime < 300 && !circle.fadeOut) {
-                    circle.radius = 50 + (elapsedTime / 300) * 2; // 0.5秒かけて1.1倍のサイズにする
+                    circle.radius = 50 + (elapsedTime / 300) * 5; // 0.3秒かけて1.1倍のサイズにする
                 } else if (circle.fadeOut) {
                     circle.radius *= 0.95; // フェードアウト時に半径を減少させる
                 }
@@ -196,6 +214,7 @@
                 }
 
                 if (circle.alpha <= 0 || circle.radius <= 0.5) {
+                    console.log('Circle removed:', circle);
                     circles.splice(index, 1); // 完全に透明になるか、非常に小さくなったら配列から削除
                 }
             });
