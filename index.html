@@ -117,7 +117,7 @@
         function handleMouseMove(e) {
             if (mouseDown) {
                 ignoreEvent = true;
-                console.log('mousemove detected while mouse down, starting fade out'); // コンソールログ出力
+                console.log('mousemove detected within startDelay, ignoring circle addition'); // コンソールログ出力
                 startFadeOut(); // 円をフェードアウト開始
             }
             if (isDrawing && (Date.now() - lastDrawTime > drawInterval)) {
@@ -224,7 +224,6 @@
 
         draw();
     </script>
-
 </body>
 
 </html>
